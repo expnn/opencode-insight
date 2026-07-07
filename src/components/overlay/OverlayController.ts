@@ -34,6 +34,13 @@ export class OverlayController {
   // Polling timer
   private updateData: ReturnType<typeof setTimeout> | null = null;
 
+  // 键盘关闭：通过 opencode 的 keymap 拦截（而非 renderer.keyInput.on）。
+  // opencode 的 @opentui/keymap 用 prependListener("keypress") 在 renderer.keyInput
+  // 之前消费按键，匹配绑定后 stopPropagation，导致插件用 renderer.keyInput.on
+  // 注册的常规监听器永远收不到 Escape/q。keymap.intercept("key") 在绑定派发前拦截，
+  // ctx.consume() 可截断事件，是插件接收键盘的正确通道。
+  private keyDispose: (() => void) | null = null;
+
   private readonly sidebarCategories: SidebarCategory[] = ["Overview", "Timeline"];
 
   // Live data cache
@@ -90,6 +97,16 @@ export class OverlayController {
   mount() {
     this.previous = this.stash();
     this.root.add(this.overlay);
+    // 通过 opencode keymap 拦截 Escape/q 关闭（见 keyDispose 字段注释）。
+    this.keyDispose = this.props.api.keymap.intercept("key", (ctx: { event: { name: string; ctrl: boolean; meta: boolean; shift: boolean }; consume: (o?: { preventDefault?: boolean; stopPropagation?: boolean }) => void }) => {
+      const key = ctx.event;
+      const isEscape = key.name === "escape";
+      const isQuit = key.name === "q" && !key.ctrl && !key.meta && !key.shift;
+      if (isEscape || isQuit) {
+        ctx.consume({ stopPropagation: true, preventDefault: true });
+        this.props.close();
+      }
+    });
 
     const poll = async () => {
       if (this.cleanedUp) return;
@@ -106,12 +123,21 @@ export class OverlayController {
   }
 
   cleanup() {
+    // 幂等守卫：close() 会直接调用 cleanup()，onCleanup 兜底可能再调一次。
+    if (this.cleanedUp) return;
     this.cleanedUp = true;
+    this.keyDispose?.();
+    this.keyDispose = null;
     if (this.updateData) {
       clearTimeout(this.updateData);
       this.updateData = null;
     }
-    this.root.remove(this.overlay.id);
+    // 关键：用 destroyRecursively() 而非 root.remove(overlay.id)。
+    // opencode 运行时捆绑的 @opentui/core (v0.4.x) 的 remove 要求传入 Renderable 对象，
+    // 传字符串 id 会 throw "remove expects a renderable child object"，导致 overlay 永不移除。
+    // destroyRecursively() 是 Renderable 自带方法，内部以对象方式从 parent 移除并销毁全部子元素，
+    // 跨 opentui 版本都安全。
+    this.overlay.destroyRecursively();
     if (this.previous && this.previous.focus) {
       this.previous.focus.focus();
     }
@@ -141,6 +167,10 @@ export class OverlayController {
       borderColor: t.border,
       flexDirection: "row",
       focusable: true,
+      // opencode 自身的 dialog 用 zIndex 3000；不设 zIndex（默认 0）时，插件直接加到
+      // renderer.root 的 overlay 会被 opencode SolidJS 树在命中网格中压在底下，
+      // 点击落到 opencode 主 UI 而非 overlay 内的关闭按钮。设为 9999 确保命中优先。
+      zIndex: 9999,
     });
     this.sidebar = new BoxRenderable(this.renderer, {
       width: "20%",
@@ -152,20 +182,31 @@ export class OverlayController {
       flexDirection: "column",
       border: true,
     });
+    // 顶部栏：右对齐放置关闭按钮。
+    // 注意：早期版本用 marginTop: -1 把按钮压到 viewPanel 的 border 行上，
+    // 但 opentui 命中测试中 border 行归属于 viewPanel 自身（先注册进 hit grid），
+    // 子元素骑在 border 上的命中区域不可靠，导致 onMouseUp 永远不触发。
+    // 改为正常流式布局 + 显式 focusable，确保点击可靠命中。
+    const topBar = new BoxRenderable(this.renderer, {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      height: 1,
+      marginRight: 1,
+    });
     const closeBtn: TextRenderable = new TextRenderable(this.renderer, {
-      content: "[X] Close",
+      content: "[X] Close  (Esc / q)",
       fg: t.error,
       bg: t.background,
-      marginTop: -1,
-      zIndex: 10,
       onMouseUp: () => this.props.close(),
       onMouseOver: () => (closeBtn.bg = t.backgroundElement),
       onMouseOut: () => (closeBtn.bg = t.background),
     });
+    closeBtn.focusable = true;
+    topBar.add(closeBtn);
 
     this.overlay.add(this.sidebar);
     this.overlay.add(this.viewPanel);
-    this.viewPanel.add(closeBtn);
+    this.viewPanel.add(topBar);
   }
 
   private selectSidebar(cat: SidebarCategory) {

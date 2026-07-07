@@ -9,10 +9,26 @@ interface FullscreenOverlayProps {
 }
 
 export default function FullscreenOverlay(props: FullscreenOverlayProps) {
+  let controller: OverlayController | null = null;
+
   onMount(() => {
-    const controller = new OverlayController({ api: props.api, sessionId: props.sessionId, close: props.close });
+    controller = new OverlayController({
+      api: props.api,
+      sessionId: props.sessionId,
+      // close 直接命令式拆除 overlay（destroyRecursively + 注销 keymap 拦截），
+      // 不依赖 SolidJS <Show> 销毁 → onCleanup 这条链。
+      close: () => {
+        controller?.cleanup();
+        controller = null;
+        props.close();
+      },
+    });
     controller.mount();
-    onCleanup(() => controller.cleanup());
+    // 兜底：若组件被其他方式卸载，也确保清理。
+    onCleanup(() => {
+      controller?.cleanup();
+      controller = null;
+    });
   });
 
   return null;

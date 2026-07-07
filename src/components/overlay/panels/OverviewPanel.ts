@@ -129,6 +129,12 @@ export class OverviewPanel {
   ): MetricCard[] {
     const avgTokens = messageCount > 0 ? Math.round(acc.total / messageCount) : 0;
 
+    // Cache 命中率 = cacheRead / (cacheRead + input)
+    // opencode 的 tokens.input 是非缓存输入（Anthropic 约定，cache.read 为单独字段），
+    // 模型接收的总输入 = 非缓存 input + 缓存 cacheRead，命中率 = 缓存命中 / 总输入。
+    const cacheTotalInput = acc.cacheRead + acc.input;
+    const cacheHitPct = cacheTotalInput > 0 ? ((acc.cacheRead / cacheTotalInput) * 100).toFixed(1) : "0.0";
+
     return [
       {
         icon: "🪙",
@@ -142,8 +148,8 @@ export class OverviewPanel {
         title: "Cache",
         value: hasRealData ? fmtNum(acc.cacheRead + acc.cacheWrite) : "0",
         subtitle: hasRealData
-          ? `in: ${fmtNum(acc.cacheRead)} / out: ${fmtNum(acc.cacheWrite)}`
-          : "in: 0 / out: 0",
+          ? `hit ${cacheHitPct}% · in: ${fmtNum(acc.cacheRead)} / out: ${fmtNum(acc.cacheWrite)}`
+          : "hit 0.0% · in: 0 / out: 0",
         color: this.api.theme.current.info,
       },
       {

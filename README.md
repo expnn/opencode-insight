@@ -23,6 +23,11 @@ Add to your `tui.json`:
 
 Click **"🤖 Opencode Insight"** in the sidebar to open the fullscreen overlay.
 
+To **close** the overlay:
+
+- Press `Esc` or `q`, or
+- Click the **`[X] Close`** button at the top-right of the overlay.
+
 ### Overview Panel
 
 | Card | Shows |
