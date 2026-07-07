@@ -16,6 +16,6 @@ async function tuiMonitorPlugin(
 }
 
 export default {
-  id: "opencode-insight",
+  id: "expnn-opencode-insight",
   tui: tuiMonitorPlugin,
 };

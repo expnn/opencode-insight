@@ -12,7 +12,7 @@ if (!tag) {
   process.exit(1);
 }
 
-const repo = "urayoru113/opencode-insight";
+const repo = "expnn/opencode-insight";
 const rawBase = `https://raw.githubusercontent.com/${repo}/${tag}/`;
 
 const readmePath = join(root, "README.md");

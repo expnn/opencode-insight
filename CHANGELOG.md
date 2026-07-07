@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/expnn/opencode-insight/compare/v0.1.7...v0.1.8) (2026-07-07)
+
+
+### Bug Fixes
+
+* Fixed the issue where the overlay could not be disabled in opencode v1.17.14 ([3cda4c9](https://github.com/expnn/opencode-insight/commit/3cda4c93290462893336749c10a4cae7618f4436))
+
 ## [0.1.7](https://github.com/urayoru113/opencode-insight/compare/v0.1.6...v0.1.7) (2026-06-17)
 
 
