@@ -7,3 +7,7 @@ docs/
 *.bak
 
 token-optimizer
+
+# BEGIN opencode-insight clonedeps
+.slim/clonedeps/repos/
+# END opencode-insight clonedeps

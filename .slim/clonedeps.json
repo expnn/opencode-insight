@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-07-07T00:00:00.000Z",
+  "dependencies": [
+    {
+      "name": "oh-my-opencode-slim",
+      "resolvedVersion": "main",
+      "repoUrl": "https://github.com/alvinunreal/oh-my-opencode-slim.git",
+      "ref": "main@db992db08e391965d99df106a945f70142d8bce1",
+      "path": ".slim/clonedeps/repos/alvinunreal__oh-my-opencode-slim",
+      "packagePath": ".",
+      "reason": "Reference source for analyzing how oh-my-opencode-slim spawns subagents and the opencode parent/child session model — explains why opencode-insight's cost tracking does not capture subagent usage."
+    }
+  ]
+}
