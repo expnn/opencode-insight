@@ -1,7 +1,12 @@
 import { BoxRenderable, TextRenderable, TextAttributes, ScrollBoxRenderable } from "@opentui/core";
 import type { CliRenderer } from "@opentui/core";
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
-import { getTimelineData, getMessageParts, type TimelineEntry } from "../../../lib/apiDataSource";
+import {
+  getTimelineData,
+  getMessagePartsFromAggregated,
+  type TimelineEntry,
+  type AggregatedData,
+} from "../../../lib/apiDataSource";
 import { fmtNum } from "../../../lib/uiHelpers";
 
 export type View = "list" | "detail";
@@ -14,15 +19,17 @@ export class TimelinePanel {
   private data: TimelineEntry[] = [];
   private prevCount = 0;
   private selectedIndex = 0;
+  private aggregatedData: AggregatedData | null = null;
 
   constructor(
     private renderer: CliRenderer,
     private api: TuiPluginApi,
   ) {}
 
-  /** Load data from API. Returns true if count changed (needs re-render). */
-  loadData(sessionId: string): boolean {
-    const newData = getTimelineData(this.api, sessionId);
+  /** Load data from AggregatedData. Returns true if count changed (needs re-render). */
+  loadData(aggregated: AggregatedData): boolean {
+    this.aggregatedData = aggregated;
+    const newData = getTimelineData(aggregated.messages);
     const changed = newData.length !== this.prevCount;
     this.data = newData;
     this.prevCount = newData.length;
@@ -390,7 +397,9 @@ export class TimelinePanel {
 
     container.add(infoCard);
 
-    const parts = getMessageParts(this.api, item.id);
+    const parts = this.aggregatedData
+      ? getMessagePartsFromAggregated(this.aggregatedData, item.id)
+      : [];
     if (parts.length > 0) {
       for (const part of parts) {
         const isThinking = part.type === "reasoning";

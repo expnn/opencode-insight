@@ -1,8 +1,13 @@
-import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
-import type { GlobalSession, Part, ReasoningPart, TextPart, ToolPart } from "@opencode-ai/sdk/v2";
+import type { Part, ReasoningPart, TextPart, ToolPart } from "@opencode-ai/sdk/v2";
+import type { AggregatedMessage, AggregatedData } from "./sessionAggregator";
 import { extractMessageTokens, getDisplayModel, isAssistantMessage } from "./tokenHelpers";
 
-// ── Re-export interfaces for backward compatibility ───────────────────
+// ── Re-export aggregator types for single import surface ───────────
+
+export type { AggregatedMessage, AggregatedData } from "./sessionAggregator";
+export { aggregateSessionData, invalidateAggregationCache } from "./sessionAggregator";
+
+// ── Interfaces ───────────────────────────────────────────────────────
 
 export interface TimelineEntry {
   id: string;
@@ -66,19 +71,6 @@ export interface AccumulatedTokens {
   cost: number;
 }
 
-interface SessionStats {
-  id: string;
-  title: string;
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  reasoningTokens: number;
-  cacheRead: number;
-  cacheWrite: number;
-  totalTokens: number;
-  cost: number;
-}
-
 export interface ToolCallEntry {
   id: string;
   messageId: string;
@@ -105,29 +97,21 @@ function isToolPart(part: Part): part is ToolPart {
   return part.type === "tool";
 }
 
-// ── Token Usage ─────────────────────────────────────────────────────
+// ── Token Usage (from AggregatedMessage[]) ───────────────────────────
 
-export function getTokenUsage(api: TuiPluginApi, sessionId?: string): RealTokenUsageEntry[] {
-  if (!sessionId) return [];
-  const messages = api.state.session.messages(sessionId);
-
-  const partTypesMap = new Map<string, string[]>();
-  for (const msg of messages) {
-    const parts = api.state.part(msg.id);
-    const types = new Set<string>();
-    for (const part of parts) {
-      types.add(part.type);
-    }
-    partTypesMap.set(msg.id, Array.from(types));
-  }
-
-  return messages.map((msg) => {
+export function getTokenUsage(messages: AggregatedMessage[]): RealTokenUsageEntry[] {
+  return messages.map((aggMsg) => {
+    const msg = aggMsg.message;
     const tokens = extractMessageTokens(msg);
     const assistant = isAssistantMessage(msg);
+    const partTypes = new Set<string>();
+    for (const part of aggMsg.parts) {
+      partTypes.add(part.type);
+    }
 
     return {
       id: msg.id,
-      sessionId: msg.sessionID,
+      sessionId: aggMsg.sessionID,
       ...tokens,
       model: assistant ? msg.modelID : "unknown",
       provider: assistant ? msg.providerID : "unknown",
@@ -135,16 +119,25 @@ export function getTokenUsage(api: TuiPluginApi, sessionId?: string): RealTokenU
       timestamp: msg.time.created,
       role: msg.role,
       agent: msg.agent ?? "unknown",
-      partTypes: partTypesMap.get(msg.id) ?? [],
+      partTypes: Array.from(partTypes),
     };
   });
 }
 
-// ── Message Parts ───────────────────────────────────────────────────
+// ── Message Parts (from AggregatedData, inline parts) ───────────────
 
-export function getMessageParts(api: TuiPluginApi, messageId: string): MessagePart[] {
-  return api.state
-    .part(messageId)
+/**
+ * Resolve message parts from the inline AggregatedData (no api.state.part).
+ * Looks up the AggregatedMessage by messageID and returns its text/reasoning parts.
+ */
+export function getMessagePartsFromAggregated(
+  aggregated: AggregatedData,
+  messageId: string,
+): MessagePart[] {
+  const aggMsg = aggregated.messages.find((m) => m.message.id === messageId);
+  if (!aggMsg) return [];
+
+  return aggMsg.parts
     .filter((part): part is TextPart | ReasoningPart => isTextPart(part) || isReasoningPart(part))
     .map((part) => ({
       type: part.type,
@@ -153,20 +146,19 @@ export function getMessageParts(api: TuiPluginApi, messageId: string): MessagePa
     }));
 }
 
-// ── Timeline ────────────────────────────────────────────────────────
+// ── Timeline (from AggregatedMessage[]) ──────────────────────────────
 
-export function getTimelineData(api: TuiPluginApi, sessionId?: string): TimelineEntry[] {
-  if (!sessionId) return [];
+export function getTimelineData(messages: AggregatedMessage[]): TimelineEntry[] {
   const entries: TimelineEntry[] = [];
 
-  const messages = api.state.session.messages(sessionId);
-  for (const msg of messages) {
+  for (const aggMsg of messages) {
+    const msg = aggMsg.message;
     const tokens = extractMessageTokens(msg);
     const assistant = isAssistantMessage(msg);
 
     entries.push({
       id: msg.id,
-      sessionId: msg.sessionID,
+      sessionId: aggMsg.sessionID,
       type: "message",
       timestamp: msg.time.created,
       agent: msg.agent ?? "unknown",
@@ -177,8 +169,8 @@ export function getTimelineData(api: TuiPluginApi, sessionId?: string): Timeline
       ...tokens,
     });
 
-    const parts = api.state.part(msg.id);
-    for (const part of parts) {
+    // Use inline parts (no api.state.part)
+    for (const part of aggMsg.parts) {
       if (isToolPart(part)) {
         const state = part.state;
         entries.push({
@@ -192,80 +184,29 @@ export function getTimelineData(api: TuiPluginApi, sessionId?: string): Timeline
           callId: part.callID,
           status: state.status,
           toolInput: state.status !== "pending" ? state.input : {},
-          toolOutput: state.status === "completed" ? state.output : state.status === "error" ? state.error : "",
+          toolOutput:
+            state.status === "completed"
+              ? state.output
+              : state.status === "error"
+                ? state.error
+                : "",
         });
       }
     }
   }
 
+  // Sort by time desc for display
   entries.sort((a, b) => b.timestamp - a.timestamp);
   return entries;
 }
 
-// ── All Session Stats ───────────────────────────────────────────────
+// ── Tool Calls (from AggregatedMessage[]) ────────────────────────────
 
-export async function getAllSessionStats(api: TuiPluginApi): Promise<SessionStats[]> {
-  const result = await api.client.experimental.session.list({ limit: 50 });
-  const sessions: GlobalSession[] = (result.data as GlobalSession[]) ?? [];
-
-  return sessions.map((session) => {
-    const tokens = session.tokens ?? {
-      input: 0,
-      output: 0,
-      reasoning: 0,
-      cache: { read: 0, write: 0 },
-    };
-    return {
-      id: session.id,
-      title: session.title || "Untitled",
-      model: session.model?.id || "unknown",
-      inputTokens: tokens.input ?? 0,
-      outputTokens: tokens.output ?? 0,
-      reasoningTokens: tokens.reasoning ?? 0,
-      cacheRead: tokens.cache?.read ?? 0,
-      cacheWrite: tokens.cache?.write ?? 0,
-      totalTokens: (tokens.input ?? 0) + (tokens.output ?? 0) + (tokens.reasoning ?? 0),
-      cost: session.cost ?? 0,
-    };
-  });
-}
-
-// ── Accumulated Tokens ──────────────────────────────────────────────
-
-export async function getAccumulatedTokenUsage(api: TuiPluginApi): Promise<AccumulatedTokens> {
-  const sessions = await getAllSessionStats(api);
-  return sessions.reduce(
-    (acc, s) => ({
-      input: acc.input + s.inputTokens,
-      output: acc.output + s.outputTokens,
-      reasoning: acc.reasoning + s.reasoningTokens,
-      cacheRead: acc.cacheRead + s.cacheRead,
-      cacheWrite: acc.cacheWrite + s.cacheWrite,
-      total: acc.total + s.totalTokens,
-      cost: acc.cost + s.cost,
-    }),
-    {
-      input: 0,
-      output: 0,
-      reasoning: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      total: 0,
-      cost: 0,
-    } as AccumulatedTokens,
-  );
-}
-
-// ── Tool Calls ──────────────────────────────────────────────────────
-
-export function getToolCalls(api: TuiPluginApi, sessionId?: string): ToolCallEntry[] {
-  if (!sessionId) return [];
-  const messages = api.state.session.messages(sessionId);
+export function getToolCalls(messages: AggregatedMessage[]): ToolCallEntry[] {
   const entries: ToolCallEntry[] = [];
 
-  for (const msg of messages) {
-    const parts = api.state.part(msg.id);
-    for (const part of parts) {
+  for (const aggMsg of messages) {
+    for (const part of aggMsg.parts) {
       if (isToolPart(part)) {
         const state = part.state;
         entries.push({
@@ -276,8 +217,13 @@ export function getToolCalls(api: TuiPluginApi, sessionId?: string): ToolCallEnt
           callId: part.callID,
           status: state.status,
           input: state.status !== "pending" ? state.input : {},
-          output: state.status === "completed" ? state.output : state.status === "error" ? state.error : "",
-          timeCreated: msg.time.created,
+          output:
+            state.status === "completed"
+              ? state.output
+              : state.status === "error"
+                ? state.error
+                : "",
+          timeCreated: aggMsg.message.time.created,
         });
       }
     }
@@ -286,20 +232,18 @@ export function getToolCalls(api: TuiPluginApi, sessionId?: string): ToolCallEnt
   return entries;
 }
 
-export function getToolCallCount(api: TuiPluginApi, sessionId?: string): number {
-  if (!sessionId) return 0;
+export function getToolCallCount(messages: AggregatedMessage[]): number {
   let count = 0;
-  for (const msg of api.state.session.messages(sessionId)) {
-    for (const part of api.state.part(msg.id)) {
+  for (const aggMsg of messages) {
+    for (const part of aggMsg.parts) {
       if (isToolPart(part)) count++;
     }
   }
   return count;
 }
 
-export function getMessageCount(api: TuiPluginApi, sessionId?: string): number {
-  if (!sessionId) return 0;
-  return api.state.session.messages(sessionId).length;
+export function getMessageCount(messages: AggregatedMessage[]): number {
+  return messages.length;
 }
 
 export interface ToolUsageStat {
@@ -307,8 +251,8 @@ export interface ToolUsageStat {
   count: number;
 }
 
-export function getToolUsageStats(api: TuiPluginApi, sessionId?: string): ToolUsageStat[] {
-  const calls = getToolCalls(api, sessionId);
+export function getToolUsageStats(messages: AggregatedMessage[]): ToolUsageStat[] {
+  const calls = getToolCalls(messages);
   const map = new Map<string, number>();
   for (const call of calls) {
     const name = call.toolName || "unknown";
@@ -319,18 +263,21 @@ export function getToolUsageStats(api: TuiPluginApi, sessionId?: string): ToolUs
     .sort((a, b) => b.count - a.count);
 }
 
-// ── Agent Usage ─────────────────────────────────────────────────────
+// ── Agent Usage (from AggregatedMessage[]) ───────────────────────────
 
 export interface AgentUsageStat {
   agentName: string;
   count: number;
 }
 
-export function getAgentUsageStats(api: TuiPluginApi, sessionId?: string): AgentUsageStat[] {
-  if (!sessionId) return [];
+/**
+ * Count messages by msg.message.agent.
+ * Decision: "Agents" list keeps "messages per agent" semantics.
+ */
+export function getAgentUsageStats(messages: AggregatedMessage[]): AgentUsageStat[] {
   const map = new Map<string, number>();
-  for (const msg of api.state.session.messages(sessionId)) {
-    const agent = msg.agent ?? "unknown";
+  for (const aggMsg of messages) {
+    const agent = aggMsg.message.agent ?? "unknown";
     map.set(agent, (map.get(agent) ?? 0) + 1);
   }
   return Array.from(map.entries())

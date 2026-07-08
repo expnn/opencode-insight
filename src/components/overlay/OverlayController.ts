@@ -6,6 +6,8 @@ import { OverviewPanel } from "./panels/OverviewPanel";
 import { SidebarPanel } from "./panels/SidebarPanel";
 
 import type { SidebarCategory, View } from "./types";
+import type { AggregatedData } from "../../lib/apiDataSource";
+import { aggregateSessionData, invalidateAggregationCache } from "../../lib/apiDataSource";
 
 interface OverlayControllerProps {
   api: TuiPluginApi;
@@ -46,13 +48,14 @@ export class OverlayController {
   // Live data cache
   private timelinePanel: TimelinePanel;
   private overviewPanel: OverviewPanel;
+  private aggregatedData: AggregatedData | null = null;
 
   constructor(private props: OverlayControllerProps) {
     this.renderer = props.api.renderer;
     this.root = this.renderer.root;
 
     this.timelinePanel = new TimelinePanel(this.renderer, props.api);
-    this.overviewPanel = new OverviewPanel(this.renderer, props.api, props.sessionId);
+    this.overviewPanel = new OverviewPanel(this.renderer, props.api);
 
     this.buildOverlay();
     new SidebarPanel({
@@ -75,7 +78,13 @@ export class OverlayController {
   private async loadRealData(): Promise<boolean> {
     let changed = false;
     try {
-      const timelineChanged = this.timelinePanel.loadData(this.props.sessionId);
+      // Fetch aggregated data once (session tree + all messages)
+      this.aggregatedData = await aggregateSessionData(
+        this.props.api.client,
+        this.props.sessionId,
+      );
+
+      const timelineChanged = this.timelinePanel.loadData(this.aggregatedData);
       if (timelineChanged) changed = true;
 
       if (this.fetchError) {
@@ -132,6 +141,8 @@ export class OverlayController {
       clearTimeout(this.updateData);
       this.updateData = null;
     }
+    // Invalidate aggregation cache so next mount starts fresh
+    invalidateAggregationCache(this.props.sessionId);
     // 关键：用 destroyRecursively() 而非 root.remove(overlay.id)。
     // opencode 运行时捆绑的 @opentui/core (v0.4.x) 的 remove 要求传入 Renderable 对象，
     // 传字符串 id 会 throw "remove expects a renderable child object"，导致 overlay 永不移除。
@@ -237,7 +248,9 @@ export class OverlayController {
 
     switch (this.currentSidebarCategory) {
       case "Overview":
-        this.overviewPanel.render(this.contentArea);
+        if (this.aggregatedData) {
+          this.overviewPanel.render(this.contentArea, this.aggregatedData);
+        }
         break;
       case "Timeline":
         await this.timelinePanel.render(

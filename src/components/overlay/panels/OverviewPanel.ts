@@ -9,6 +9,7 @@ import {
   getAgentUsageStats,
   type AccumulatedTokens,
   type RealTokenUsageEntry,
+  type AggregatedData,
 } from "../../../lib/apiDataSource";
 import { fmtNum, itemColor, miniBar, truncate } from "../../../lib/uiHelpers";
 
@@ -29,19 +30,19 @@ export class OverviewPanel {
   constructor(
     private renderer: CliRenderer,
     private api: TuiPluginApi,
-    private sessionId: string,
   ) {}
 
-  render(contentArea: BoxRenderable): void {
-    const tokenUsage = getTokenUsage(this.api, this.sessionId);
+  render(contentArea: BoxRenderable, aggregated: AggregatedData): void {
+    const messages = aggregated.messages;
+    const tokenUsage = getTokenUsage(messages);
     const acc = this.sumTokenUsage(tokenUsage);
     const hasRealData = acc.total > 0;
 
     const modelEntries = this.buildModelMap(tokenUsage);
-    const toolCount = getToolCallCount(this.api, this.sessionId);
-    const toolStats = getToolUsageStats(this.api, this.sessionId);
-    const agentStats = getAgentUsageStats(this.api, this.sessionId);
-    const messageCount = getMessageCount(this.api, this.sessionId);
+    const toolCount = getToolCallCount(messages);
+    const toolStats = getToolUsageStats(messages);
+    const agentStats = getAgentUsageStats(messages);
+    const messageCount = getMessageCount(messages);
 
     const cards = this.buildCards(acc, hasRealData, toolCount, messageCount);
 
