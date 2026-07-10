@@ -13,6 +13,10 @@ interface OverlayControllerProps {
   api: TuiPluginApi;
   sessionId: string;
   close: () => void;
+  /** Overlay poll interval in ms (default 2000). */
+  refreshIntervalMs?: number;
+  /** Sidebar (left nav) width as % of terminal width (default 20). */
+  overlayNavPct?: number;
 }
 
 export class OverlayController {
@@ -117,13 +121,14 @@ export class OverlayController {
       }
     });
 
+    const interval = this.props.refreshIntervalMs ?? 2000;
     const poll = async () => {
       if (this.cleanedUp) return;
       const changed = await this.loadRealData();
       if (changed) {
         await this.renderViewPanel();
       }
-      this.updateData = setTimeout(poll, 2000);
+      this.updateData = setTimeout(poll, interval);
     };
     this.renderViewPanel();
     poll();
@@ -183,13 +188,14 @@ export class OverlayController {
       // 点击落到 opencode 主 UI 而非 overlay 内的关闭按钮。设为 9999 确保命中优先。
       zIndex: 9999,
     });
+    const sidebarWidth = this.props.overlayNavPct ?? 20;
     this.sidebar = new BoxRenderable(this.renderer, {
-      width: "20%",
+      width: `${sidebarWidth}%`,
       flexDirection: "column",
       border: true,
     });
     this.viewPanel = new BoxRenderable(this.renderer, {
-      width: "80%",
+      width: `${100 - sidebarWidth}%`,
       flexDirection: "column",
       border: true,
     });

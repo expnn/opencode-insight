@@ -124,6 +124,45 @@ export function getTokenUsage(messages: AggregatedMessage[]): RealTokenUsageEntr
   });
 }
 
+// ── Sidebar compact stats (from AggregatedData) ──────────────────────
+
+export interface SidebarStats {
+  /** Total cost across the whole session tree (incl. subagents), USD */
+  cost: number;
+  /** Cache hit rate as a pre-formatted string, e.g. "42.1" (percent) */
+  cacheHitPct: string;
+  /** Whether any real token data was aggregated */
+  hasData: boolean;
+}
+
+/**
+ * Compact stats for the sidebar line: total cost (incl. subagents) and cache
+ * hit rate. Mirrors OverviewPanel's accumulation so the sidebar and overlay
+ * always agree. Cache hit rate = cacheRead / (cacheRead + input) * 100, per the
+ * Anthropic convention where tokens.input is the non-cached input.
+ */
+export function getSidebarStats(aggregated: AggregatedData): SidebarStats {
+  const tokenUsage = getTokenUsage(aggregated.messages);
+  const acc = tokenUsage.reduce<AccumulatedTokens>(
+    (sum, e) => ({
+      input: sum.input + e.inputTokens,
+      output: sum.output + e.outputTokens,
+      reasoning: sum.reasoning + e.reasoningTokens,
+      cacheRead: sum.cacheRead + e.cacheRead,
+      cacheWrite: sum.cacheWrite + e.cacheWrite,
+      total: sum.total + e.totalTokens,
+      cost: sum.cost + e.cost,
+    }),
+    { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, total: 0, cost: 0 },
+  );
+
+  const cacheTotalInput = acc.cacheRead + acc.input;
+  const cacheHitPct =
+    cacheTotalInput > 0 ? ((acc.cacheRead / cacheTotalInput) * 100).toFixed(1) : "0.0";
+
+  return { cost: acc.cost, cacheHitPct, hasData: acc.total > 0 };
+}
+
 // ── Message Parts (from AggregatedData, inline parts) ───────────────
 
 /**

@@ -6,6 +6,10 @@ interface FullscreenOverlayProps {
   api: TuiPluginApi;
   sessionId: string;
   close: () => void;
+  /** Forwarded to OverlayController as its poll interval (ms). */
+  overlayRefreshIntervalMs?: number;
+  /** Forwarded to OverlayController as the sidebar (left nav) width %. */
+  overlayNavPct?: number;
 }
 
 export default function FullscreenOverlay(props: FullscreenOverlayProps) {
@@ -15,6 +19,8 @@ export default function FullscreenOverlay(props: FullscreenOverlayProps) {
     controller = new OverlayController({
       api: props.api,
       sessionId: props.sessionId,
+      refreshIntervalMs: props.overlayRefreshIntervalMs,
+      overlayNavPct: props.overlayNavPct,
       // close 直接命令式拆除 overlay（destroyRecursively + 注销 keymap 拦截），
       // 不依赖 SolidJS <Show> 销毁 → onCleanup 这条链。
       close: () => {
