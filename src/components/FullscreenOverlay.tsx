@@ -1,15 +1,11 @@
 import { onCleanup, onMount } from "solid-js";
-import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
+import type { HostAdapter } from "../host/types";
 import { OverlayController } from "./overlay/OverlayController";
 
 interface FullscreenOverlayProps {
-  api: TuiPluginApi;
+  adapter: HostAdapter;
   sessionId: string;
   close: () => void;
-  /** Forwarded to OverlayController as its poll interval (ms). */
-  overlayRefreshIntervalMs?: number;
-  /** Forwarded to OverlayController as the sidebar (left nav) width %. */
-  overlayNavPct?: number;
 }
 
 export default function FullscreenOverlay(props: FullscreenOverlayProps) {
@@ -17,11 +13,9 @@ export default function FullscreenOverlay(props: FullscreenOverlayProps) {
 
   onMount(() => {
     controller = new OverlayController({
-      api: props.api,
+      adapter: props.adapter,
       sessionId: props.sessionId,
-      refreshIntervalMs: props.overlayRefreshIntervalMs,
-      overlayNavPct: props.overlayNavPct,
-      // close 直接命令式拆除 overlay（destroyRecursively + 注销 keymap 拦截），
+      // close 直接命令式拆除 overlay（destroyRecursively + 注销键盘拦截），
       // 不依赖 SolidJS <Show> 销毁 → onCleanup 这条链。
       close: () => {
         controller?.cleanup();

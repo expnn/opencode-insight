@@ -1,9 +1,9 @@
 import { BoxRenderable, TextRenderable, TextAttributes, CliRenderer } from "@opentui/core";
 import { SidebarCategory } from "../types";
-import * as tui from "@opencode-ai/plugin/tui";
+import type { ThemeView } from "../../../host/types";
 
 export interface SidebarPanelProps {
-  api: tui.TuiPluginApi;
+  theme: ThemeView;
   renderer: CliRenderer;
   sidebarContainer: BoxRenderable;
   sidebarCategories: SidebarCategory[];
@@ -21,7 +21,7 @@ export class SidebarPanel {
   private categoryBoxes: BoxRenderable[] = [];
 
   private get theme() {
-    return this.props.api.theme.current;
+    return this.props.theme;
   }
 
   constructor(private props: SidebarPanelProps) {

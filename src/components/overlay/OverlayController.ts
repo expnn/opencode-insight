@@ -1,5 +1,5 @@
 import { BoxRenderable, Renderable, TextAttributes, TextRenderable } from "@opentui/core";
-import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
+import type { HostAdapter } from "../../host/types";
 
 import { TimelinePanel } from "./panels/TimelinePanel";
 import { OverviewPanel } from "./panels/OverviewPanel";
@@ -7,16 +7,11 @@ import { SidebarPanel } from "./panels/SidebarPanel";
 
 import type { SidebarCategory, View } from "./types";
 import type { AggregatedData } from "../../lib/apiDataSource";
-import { aggregateSessionData, invalidateAggregationCache } from "../../lib/apiDataSource";
 
 interface OverlayControllerProps {
-  api: TuiPluginApi;
+  adapter: HostAdapter;
   sessionId: string;
   close: () => void;
-  /** Overlay poll interval in ms (default 2000). */
-  refreshIntervalMs?: number;
-  /** Sidebar (left nav) width as % of terminal width (default 20). */
-  overlayNavPct?: number;
 }
 
 export class OverlayController {
@@ -28,7 +23,7 @@ export class OverlayController {
   private sidebar!: BoxRenderable;
   private viewPanel!: BoxRenderable;
   private contentArea!: BoxRenderable;
-  private previous: { focus: Renderable | null; mode: string } | null = null;
+  private previous: { focus: Renderable | null } | null = null;
 
   // State
   private currentSidebarCategory: SidebarCategory = "Overview";
@@ -55,15 +50,15 @@ export class OverlayController {
   private aggregatedData: AggregatedData | null = null;
 
   constructor(private props: OverlayControllerProps) {
-    this.renderer = props.api.renderer;
+    this.renderer = props.adapter.renderer;
     this.root = this.renderer.root;
 
-    this.timelinePanel = new TimelinePanel(this.renderer, props.api);
-    this.overviewPanel = new OverviewPanel(this.renderer, props.api);
+    this.timelinePanel = new TimelinePanel(this.renderer, props.adapter.theme);
+    this.overviewPanel = new OverviewPanel(this.renderer, props.adapter.theme);
 
     this.buildOverlay();
     new SidebarPanel({
-      api: this.props.api,
+      theme: this.props.adapter.theme,
       renderer: this.renderer,
       sidebarContainer: this.sidebar,
       sidebarCategories: this.sidebarCategories,
@@ -75,7 +70,7 @@ export class OverlayController {
   }
 
   private get theme() {
-    return this.props.api.theme.current;
+    return this.props.adapter.theme;
   }
 
   // ── Data loading ──────────────────────────────────────────
@@ -83,10 +78,7 @@ export class OverlayController {
     let changed = false;
     try {
       // Fetch aggregated data once (session tree + all messages)
-      this.aggregatedData = await aggregateSessionData(
-        this.props.api.client,
-        this.props.sessionId,
-      );
+      this.aggregatedData = await this.props.adapter.dataSource.aggregate(this.props.sessionId);
 
       const timelineChanged = this.timelinePanel.loadData(this.aggregatedData);
       if (timelineChanged) changed = true;
@@ -110,18 +102,10 @@ export class OverlayController {
   mount() {
     this.previous = this.stash();
     this.root.add(this.overlay);
-    // 通过 opencode keymap 拦截 Escape/q 关闭（见 keyDispose 字段注释）。
-    this.keyDispose = this.props.api.keymap.intercept("key", (ctx: { event: { name: string; ctrl: boolean; meta: boolean; shift: boolean }; consume: (o?: { preventDefault?: boolean; stopPropagation?: boolean }) => void }) => {
-      const key = ctx.event;
-      const isEscape = key.name === "escape";
-      const isQuit = key.name === "q" && !key.ctrl && !key.meta && !key.shift;
-      if (isEscape || isQuit) {
-        ctx.consume({ stopPropagation: true, preventDefault: true });
-        this.props.close();
-      }
-    });
+    // 关闭键路径由 host 适配器提供：v1 走 keymap.intercept，v2 走 keymap.layer。
+    this.keyDispose = this.props.adapter.closeKeys(() => this.props.close());
 
-    const interval = this.props.refreshIntervalMs ?? 2000;
+    const interval = this.props.adapter.options.overlayRefreshIntervalMs;
     const poll = async () => {
       if (this.cleanedUp) return;
       const changed = await this.loadRealData();
@@ -147,7 +131,7 @@ export class OverlayController {
       this.updateData = null;
     }
     // Invalidate aggregation cache so next mount starts fresh
-    invalidateAggregationCache(this.props.sessionId);
+    this.props.adapter.dataSource.invalidate(this.props.sessionId);
     // 关键：用 destroyRecursively() 而非 root.remove(overlay.id)。
     // opencode 运行时捆绑的 @opentui/core (v0.4.x) 的 remove 要求传入 Renderable 对象，
     // 传字符串 id 会 throw "remove expects a renderable child object"，导致 overlay 永不移除。
@@ -159,10 +143,9 @@ export class OverlayController {
     }
   }
 
-  private stash(): { focus: Renderable | null; mode: string } {
+  private stash(): { focus: Renderable | null } {
     return {
       focus: this.renderer.currentFocusedRenderable,
-      mode: this.props.api.mode.current(),
     };
   }
 
@@ -188,7 +171,7 @@ export class OverlayController {
       // 点击落到 opencode 主 UI 而非 overlay 内的关闭按钮。设为 9999 确保命中优先。
       zIndex: 9999,
     });
-    const sidebarWidth = this.props.overlayNavPct ?? 20;
+    const sidebarWidth = this.props.adapter.options.overlayNavPct;
     this.sidebar = new BoxRenderable(this.renderer, {
       width: `${sidebarWidth}%`,
       flexDirection: "column",

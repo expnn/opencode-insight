@@ -1,4 +1,9 @@
-import type { Part, ReasoningPart, TextPart, ToolPart } from "@opencode-ai/sdk/v2";
+import type {
+  NormalizedPart,
+  NormalizedReasoningPart,
+  NormalizedTextPart,
+  NormalizedToolPart,
+} from "./normalize";
 import type { AggregatedMessage, AggregatedData } from "./sessionAggregator";
 import { extractMessageTokens, getDisplayModel, isAssistantMessage } from "./tokenHelpers";
 
@@ -77,7 +82,7 @@ export interface ToolCallEntry {
   sessionId: string;
   toolName: string;
   callId: string;
-  status: ToolPart["state"]["status"];
+  status: NormalizedToolPart["state"]["status"];
   input: Record<string, unknown>;
   output: string;
   timeCreated: number;
@@ -85,15 +90,15 @@ export interface ToolCallEntry {
 
 // ── Type guards ─────────────────────────────────────────────────────
 
-function isTextPart(part: Part): part is TextPart {
+function isTextPart(part: NormalizedPart): part is NormalizedTextPart {
   return part.type === "text";
 }
 
-function isReasoningPart(part: Part): part is ReasoningPart {
+function isReasoningPart(part: NormalizedPart): part is NormalizedReasoningPart {
   return part.type === "reasoning";
 }
 
-function isToolPart(part: Part): part is ToolPart {
+function isToolPart(part: NormalizedPart): part is NormalizedToolPart {
   return part.type === "tool";
 }
 
@@ -113,8 +118,8 @@ export function getTokenUsage(messages: AggregatedMessage[]): RealTokenUsageEntr
       id: msg.id,
       sessionId: aggMsg.sessionID,
       ...tokens,
-      model: assistant ? msg.modelID : "unknown",
-      provider: assistant ? msg.providerID : "unknown",
+      model: assistant ? (msg.modelID ?? "unknown") : "unknown",
+      provider: assistant ? (msg.providerID ?? "unknown") : "unknown",
       displayModel: getDisplayModel(msg),
       timestamp: msg.time.created,
       role: msg.role,
@@ -177,7 +182,10 @@ export function getMessagePartsFromAggregated(
   if (!aggMsg) return [];
 
   return aggMsg.parts
-    .filter((part): part is TextPart | ReasoningPart => isTextPart(part) || isReasoningPart(part))
+    .filter(
+      (part): part is NormalizedTextPart | NormalizedReasoningPart =>
+        isTextPart(part) || isReasoningPart(part),
+    )
     .map((part) => ({
       type: part.type,
       text: part.text,
@@ -201,8 +209,8 @@ export function getTimelineData(messages: AggregatedMessage[]): TimelineEntry[] 
       type: "message",
       timestamp: msg.time.created,
       agent: msg.agent ?? "unknown",
-      model: assistant ? msg.modelID : "unknown",
-      provider: assistant ? msg.providerID : "unknown",
+      model: assistant ? (msg.modelID ?? "unknown") : "unknown",
+      provider: assistant ? (msg.providerID ?? "unknown") : "unknown",
       displayModel: getDisplayModel(msg),
       role: msg.role,
       ...tokens,
@@ -222,7 +230,7 @@ export function getTimelineData(messages: AggregatedMessage[]): TimelineEntry[] 
           toolName: part.tool,
           callId: part.callID,
           status: state.status,
-          toolInput: state.status !== "pending" ? state.input : {},
+          toolInput: state.input,
           toolOutput:
             state.status === "completed"
               ? state.output
@@ -255,7 +263,7 @@ export function getToolCalls(messages: AggregatedMessage[]): ToolCallEntry[] {
           toolName: part.tool,
           callId: part.callID,
           status: state.status,
-          input: state.status !== "pending" ? state.input : {},
+          input: state.input,
           output:
             state.status === "completed"
               ? state.output

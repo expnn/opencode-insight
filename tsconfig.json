@@ -13,7 +13,8 @@
     "declaration": true,
     "declarationMap": true,
     "jsx": "preserve",
-    "jsxImportSource": "@opentui/solid"
+    "jsxImportSource": "@opentui/solid",
+    "types": ["bun-types"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

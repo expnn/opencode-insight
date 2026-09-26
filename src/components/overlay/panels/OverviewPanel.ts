@@ -1,6 +1,6 @@
 import { BoxRenderable, TextRenderable } from "@opentui/core";
 import type { CliRenderer } from "@opentui/core";
-import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
+import type { ThemeView } from "../../../host/types";
 import {
   getTokenUsage,
   getToolCallCount,
@@ -29,7 +29,7 @@ interface ListStat {
 export class OverviewPanel {
   constructor(
     private renderer: CliRenderer,
-    private api: TuiPluginApi,
+    private theme: ThemeView,
   ) {}
 
   render(contentArea: BoxRenderable, aggregated: AggregatedData): void {
@@ -142,7 +142,7 @@ export class OverviewPanel {
         title: "Total Tokens",
         value: hasRealData ? fmtNum(acc.total) : "0",
         subtitle: hasRealData ? `in: ${fmtNum(acc.input)} / out: ${fmtNum(acc.output)}` : "in: 0 / out: 0",
-        color: this.api.theme.current.accent,
+        color: this.theme.accent,
       },
       {
         icon: "📦",
@@ -151,35 +151,35 @@ export class OverviewPanel {
         subtitle: hasRealData
           ? `hit ${cacheHitPct}% · in: ${fmtNum(acc.cacheRead)} / out: ${fmtNum(acc.cacheWrite)}`
           : "hit 0.0% · in: 0 / out: 0",
-        color: this.api.theme.current.info,
+        color: this.theme.info,
       },
       {
         icon: "💰",
         title: "Cost",
         value: hasRealData ? `$${acc.cost.toFixed(4)}` : "$0",
         subtitle: "USD",
-        color: this.api.theme.current.success,
+        color: this.theme.success,
       },
       {
         icon: "🔧",
         title: "Tool Calls",
         value: toolCount > 0 ? fmtNum(toolCount) : "0",
         subtitle: toolCount > 0 ? `${fmtNum(toolCount)} calls` : "No calls",
-        color: this.api.theme.current.warning,
+        color: this.theme.warning,
       },
       {
         icon: "💬",
         title: "Messages",
         value: messageCount > 0 ? fmtNum(messageCount) : "0",
         subtitle: `${messageCount} messages`,
-        color: this.api.theme.current.secondary,
+        color: this.theme.secondary,
       },
       {
         icon: "📊",
         title: "Avg Tokens",
         value: fmtNum(avgTokens),
         subtitle: "tokens / message",
-        color: this.api.theme.current.accent,
+        color: this.theme.accent,
       },
     ];
   }
@@ -190,8 +190,8 @@ export class OverviewPanel {
       flexGrow: 1,
       marginRight: idx < total - 1 ? 1 : 0,
       border: true,
-      borderColor: this.api.theme.current.borderSubtle,
-      backgroundColor: this.api.theme.current.backgroundPanel,
+      borderColor: this.theme.borderSubtle,
+      backgroundColor: this.theme.backgroundPanel,
     });
 
     const header = new TextRenderable(this.renderer, {
@@ -206,7 +206,7 @@ export class OverviewPanel {
 
     const valueText = new TextRenderable(this.renderer, {
       content: card.value,
-      fg: this.api.theme.current.text,
+      fg: this.theme.text,
       marginTop: 1,
       marginLeft: 1,
       marginRight: 1,
@@ -216,7 +216,7 @@ export class OverviewPanel {
 
     const subtitleText = new TextRenderable(this.renderer, {
       content: card.subtitle,
-      fg: this.api.theme.current.textMuted,
+      fg: this.theme.textMuted,
       marginTop: 1,
       marginLeft: 1,
       marginRight: 1,
@@ -244,7 +244,7 @@ export class OverviewPanel {
 
     const header = new TextRenderable(this.renderer, {
       content: `▸ ${title}`,
-      fg: this.api.theme.current.accent,
+      fg: this.theme.accent,
       marginTop: 2,
       marginBottom: 1,
       truncate: true,
@@ -262,7 +262,7 @@ export class OverviewPanel {
       container.add(
         new TextRenderable(this.renderer, {
           content: "None",
-          fg: this.api.theme.current.textMuted,
+          fg: this.theme.textMuted,
           marginBottom: 1,
           truncate: true,
         }),
@@ -299,14 +299,14 @@ export class OverviewPanel {
       rowBox.add(
         new TextRenderable(this.renderer, {
           content: ` ${bar} `,
-          fg: this.api.theme.current.textMuted,
+          fg: this.theme.textMuted,
         }),
       );
 
       rowBox.add(
         new TextRenderable(this.renderer, {
           content: `${fmtNum(stat.count)} (${pct}%)`,
-          fg: this.api.theme.current.textMuted,
+          fg: this.theme.textMuted,
         }),
       );
     }
@@ -326,21 +326,21 @@ export class OverviewPanel {
       rowBox.add(
         new TextRenderable(this.renderer, {
           content: `● ... others`,
-          fg: this.api.theme.current.textMuted,
+          fg: this.theme.textMuted,
         }),
       );
 
       rowBox.add(
         new TextRenderable(this.renderer, {
           content: ` ${"░".repeat(8)} `,
-          fg: this.api.theme.current.textMuted,
+          fg: this.theme.textMuted,
         }),
       );
 
       rowBox.add(
         new TextRenderable(this.renderer, {
           content: `${fmtNum(othersCount)} (${othersPct}%)`,
-          fg: this.api.theme.current.textMuted,
+          fg: this.theme.textMuted,
         }),
       );
     }

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
+    {
+      "package": "/tmp/opencode/oc-spike/v2-real",
+      "options": {
+        "overlayNavPct": 15
+      }
+    }
+  ]
+}

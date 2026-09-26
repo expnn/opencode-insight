@@ -1,0 +1,40 @@
+
+  ┃                                                                             Pong Response Verification
+  ┃  "Reply with exactly: pong"
+  ┃
+                                                                                🤖  Opencode Insight
+     pong
+                                                                                cost $0.00 · hit: 18.6%
+     ▣  Build · Space Bunny Free · 3.4s
+                                                                                Context
+                                                                                10,419 tokens
+                                                                                1% used
+                                                                                $0.00 spent
+
+                                                                                LSP
+                                                                                LSPs are disabled
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ┃
+  ┃
+  ┃
+  ┃  Build · Space Bunny Free OpenCode Zen                                      /tmp/opencode/oc-spike/project
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   /tmp/opencode/oc-spike/project                                               • OpenCode 1.18.32
+

@@ -1,6 +1,6 @@
 {
   "name": "@expnn/opencode-insight",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -26,16 +26,32 @@
   ],
   "scripts": {
     "build": "tsup",
+    "check:imports": "node scripts/check-dist-imports.mjs",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@opencode-ai/plugin": "^1.17.14",
-    "@opencode-ai/sdk": "^1.17.14",
-    "@opentui/core": "^0.4.3",
-    "@opentui/solid": "^0.4.3",
-    "solid-js": "^1.9.14"
+  "peerDependencies": {
+    "@opentui/core": ">=0.4.5",
+    "@opentui/solid": ">=0.4.5",
+    "solid-js": ">=1.9.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentui/core": {
+      "optional": true
+    },
+    "@opentui/solid": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@opencode-ai/plugin": "^1.17.14",
+    "@opencode-ai/sdk": "^1.17.14",
+    "@opencode/client": "2.0.18",
+    "@opencode/plugin": "2.0.18",
+    "@opencode/theme": "2.0.18",
     "bun-types": "latest",
     "esbuild-plugin-solid": "^0.6.0",
     "tsup": "^8.5.1",

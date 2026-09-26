@@ -1,0 +1,11 @@
+{
+  "runtime": "v2",
+  "rootSessionID": "ses_f223a588effet4vTHaBy6OcaKo",
+  "sessions": 1,
+  "messages": 2,
+  "toolCalls": 0,
+  "totalTokens": 8425,
+  "cost": 0,
+  "cacheHitPct": "5.8",
+  "hasData": true
+}

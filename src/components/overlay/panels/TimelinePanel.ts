@@ -1,6 +1,6 @@
 import { BoxRenderable, TextRenderable, TextAttributes, ScrollBoxRenderable } from "@opentui/core";
 import type { CliRenderer } from "@opentui/core";
-import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
+import type { ThemeView } from "../../../host/types";
 import {
   getTimelineData,
   getMessagePartsFromAggregated,
@@ -23,7 +23,7 @@ export class TimelinePanel {
 
   constructor(
     private renderer: CliRenderer,
-    private api: TuiPluginApi,
+    private theme: ThemeView,
   ) {}
 
   /** Load data from AggregatedData. Returns true if count changed (needs re-render). */
@@ -134,7 +134,7 @@ export class TimelinePanel {
       targetRow.add(
         new TextRenderable(this.renderer, {
           content: `${value}`,
-          fg: this.api.theme.current.syntaxNumber,
+          fg: this.theme.syntaxNumber,
           truncate: true,
         }),
       );
@@ -188,7 +188,7 @@ export class TimelinePanel {
       cell.add(
         new TextRenderable(this.renderer, {
           content: h,
-          fg: this.api.theme.current.accent,
+          fg: this.theme.accent,
           truncate: true,
           marginTop: 1,
         }),
@@ -245,7 +245,7 @@ export class TimelinePanel {
   }
 
   private buildRow(item: TimelineEntry, idx: number, onEnterDetail: (idx: number) => Promise<void>): BoxRenderable {
-    const t = this.api.theme.current;
+    const t = this.theme;
     const typeIcon = item.type === "message" ? "📃" : "🔧";
     const agentOrTool = item.type === "message" ? item.agent || "Unknown" : item.toolName || "Unknown";
     const input = item.type === "message" ? fmtNum(item.inputTokens || 0) : "-";
@@ -311,7 +311,7 @@ export class TimelinePanel {
   private renderDetail(container: BoxRenderable, back: () => Promise<void>): void {
     const backBtn = new TextRenderable(this.renderer, {
       content: "← Back to Timeline",
-      fg: this.api.theme.current.accent,
+      fg: this.theme.accent,
     });
     backBtn.focusable = true;
     backBtn.onMouseDown = async () => {
@@ -326,7 +326,7 @@ export class TimelinePanel {
       container.add(
         new TextRenderable(this.renderer, {
           content: `Error: No item at index ${this.selectedIndex}`,
-          fg: this.api.theme.current.error,
+          fg: this.theme.error,
           marginTop: 1,
         }),
       );
@@ -341,7 +341,7 @@ export class TimelinePanel {
   }
 
   private renderMessageDetail(container: BoxRenderable, item: TimelineEntry): void {
-    const t = this.api.theme.current;
+    const t = this.theme;
 
     const infoCard = new BoxRenderable(this.renderer, {
       flexDirection: "column",
@@ -470,7 +470,7 @@ export class TimelinePanel {
   }
 
   private renderToolDetail(container: BoxRenderable, item: TimelineEntry): void {
-    const t = this.api.theme.current;
+    const t = this.theme;
     const statusColor = item.status === "completed" ? t.success : item.status === "error" ? t.error : t.accent;
     const statusIcon = item.status === "completed" ? "✅" : item.status === "error" ? "❌" : "⏳";
 
@@ -646,7 +646,7 @@ export class TimelinePanel {
       attributes?: number;
     },
   ): void {
-    const t = this.api.theme.current;
+    const t = this.theme;
 
     box.add(
       new TextRenderable(this.renderer, {

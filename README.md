@@ -12,6 +12,10 @@ A monitoring plugin for [OpenCode](https://github.com/anomalyco/opencode) that p
 
 ## Installation
 
+Works on **both opencode v1 (≥ 1.3.4, 1.18.x tested) and opencode v2 (2.0.x)** from a single package: the module exposes a dual entrypoint (`tui()` for v1, `setup()` for v2).
+
+### opencode v1
+
 Add to your `tui.json` (or `tui.jsonc`):
 
 ```json
@@ -21,6 +25,50 @@ Add to your `tui.json` (or `tui.jsonc`):
 ```
 
 > The `plugin` field is an **array**. Each entry is either a string spec or a `[spec, options]` tuple — **not** an object. See [Configuration](#configuration).
+
+### opencode v2
+
+Add to your `cli.json` (CLI-only plugins):
+
+```json
+{
+  "plugins": [
+    {
+      "package": "@expnn/opencode-insight",
+      "options": {
+        "sidebarRefreshIntervalMs": 20000,
+        "overlayRefreshIntervalMs": 2000,
+        "overlayNavPct": 15
+      }
+    }
+  ]
+}
+```
+
+> v2 uses `plugins` with the **object form** `{ "package", "options" }`. If you already configured the plugin in v1's `tui.json`, v2 migrates that `plugin` array into `cli.json`'s `plugins` automatically on first run — no manual rename needed.
+
+### Running v1 and v2 side by side
+
+The official v2 installer writes to `$HOME/.opencode/bin/opencode`, **overwriting a v1 install in the same directory**, and `npm i -g @opencode/cli` adds an `opencode` bin that can shadow v1 depending on `PATH`. Both versions also share `~/.config/opencode`, `~/.cache/opencode` and `~/.local/share/opencode` by default, a known source of conflicts when both run against the same state ([anomalyco/opencode#47018](https://github.com/anomalyco/opencode/issues/47018)).
+
+To keep both installed, extract the v2 standalone binary into its own directory and run it with isolated XDG roots:
+
+```bash
+mkdir -p ~/tools/ocv2 && cd ~/tools/ocv2
+curl -fsSL -o ocv2.tgz https://opencode.ai/files/bin/2.0.18/opencode-linux-x64.tar.gz
+tar xzf ocv2.tgz
+cat > opencode2 <<'EOF'
+#!/usr/bin/env bash
+export XDG_DATA_HOME="$HOME/.local/share/ocv2"
+export XDG_CACHE_HOME="$HOME/.cache/ocv2"
+export XDG_CONFIG_HOME="$HOME/.config/ocv2"
+export XDG_STATE_HOME="$HOME/.local/state/ocv2"
+exec "$HOME/tools/ocv2/opencode" "$@"
+EOF
+chmod +x opencode2
+```
+
+Then configure the plugin in `~/.config/ocv2/opencode/cli.json` and run `~/tools/ocv2/opencode2`. v1 stays untouched at `~/.opencode/bin/opencode`.
 
 ## Configuration
 
@@ -102,7 +150,8 @@ Then restart OpenCode.
 
 ## Requirements
 
-- OpenCode >= 1.17.3
+- opencode v1 **≥ 1.3.4** (TUI plugin API; 1.18.x tested) or opencode v2 **2.0.x**
+- The host provides `@opentui/core`, `@opentui/solid` and `solid-js` (declared as optional peer dependencies)
 
 ## License
 

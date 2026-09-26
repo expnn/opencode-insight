@@ -1,48 +1,46 @@
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
+import type { Plugin } from "@opencode/plugin/tui";
 import SidebarMonitor from "./components/SidebarMonitor";
+import { createV1Adapter } from "./host/v1";
+import { createV2Adapter } from "./host/v2";
+import { parseOptions } from "./options";
 
-/** Parse a positive-ms interval option, falling back to a default. */
-function parseIntervalMs(value: unknown, fallback: number): number {
-  return typeof value === "number" && value > 0 ? value : fallback;
-}
+const PLUGIN_ID = "expnn-opencode-insight";
 
-/** Parse a sidebar width percentage, clamped to a sane [10, 40] range. */
-function parseWidthPct(value: unknown, fallback: number): number {
-  const n = typeof value === "number" && value > 0 ? value : fallback;
-  return Math.min(40, Math.max(10, n));
-}
-
+/** v1 入口：opencode v1 runtime 调用 `tui(api, options, meta)`。 */
 async function tuiMonitorPlugin(
   api: TuiPluginApi,
-  options: Record<string, unknown>,
-  _meta: { name: string; version: string }
+  options: Record<string, unknown> | undefined,
+  _meta: unknown,
 ): Promise<void> {
-  // Sidebar stat-line poll interval (ms). Defaults to 20s — cheap because
-  // aggregation reuses the per-session cache and only refetches changed sessions.
-  const sidebarRefreshIntervalMs = parseIntervalMs(options.sidebarRefreshIntervalMs, 20000);
-  // Overlay poll interval (ms). Defaults to 2s for near-real-time updates.
-  const overlayRefreshIntervalMs = parseIntervalMs(options.overlayRefreshIntervalMs, 2000);
-  // Overlay sidebar (left nav) width as a % of terminal width. Defaults to 20.
-  const overlayNavPct = parseWidthPct(options.overlayNavPct, 20);
-
-  api.slots.register({
-    slots: {
-      sidebar_content(_ctx, props: { session_id: string }) {
-        return (
-          <SidebarMonitor
-            api={api}
-            session_id={props.session_id}
-            sidebarRefreshIntervalMs={sidebarRefreshIntervalMs}
-            overlayRefreshIntervalMs={overlayRefreshIntervalMs}
-            overlayNavPct={overlayNavPct}
-          />
-        );
-      },
-    },
-  });
+  const adapter = createV1Adapter(api, parseOptions(options));
+  adapter.registerSidebar(
+    (sessionId) => <SidebarMonitor adapter={adapter} sessionId={sessionId} />,
+  );
 }
 
-export default {
-  id: "expnn-opencode-insight",
+/** v2 入口：opencode v2 runtime 调用 `setup(ctx)`，返回值作为插件清理函数。 */
+async function setupMonitorPlugin(ctx: Plugin.Context): Promise<() => void> {
+  const adapter = createV2Adapter(ctx, parseOptions(ctx.options));
+  const disposers: Array<() => void> = [];
+  disposers.push(
+    adapter.registerSidebar(
+      (sessionId) => <SidebarMonitor adapter={adapter} sessionId={sessionId} />,
+    ),
+  );
+  return () => {
+    for (const dispose of disposers) dispose();
+  };
+}
+
+/**
+ * 双形状入口：v1 loader 只读 `tui`，v2 loader 只读 `id` + `setup`，
+ * 两个 runtime 都解析 `exports["./tui"]`（已实证，见 evidence/p0-dual-entry-spike.md）。
+ */
+const plugin = {
+  id: PLUGIN_ID,
   tui: tuiMonitorPlugin,
+  setup: setupMonitorPlugin,
 };
+
+export default plugin;
