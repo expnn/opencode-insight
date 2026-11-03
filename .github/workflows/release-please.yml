@@ -1,9 +1,12 @@
 name: release-please
 
+# Manual only. Publishing is handled by .github/workflows/publish.yml on release
+# tags, and versions/CHANGELOG are maintained by hand, so this workflow has no
+# manifest to anchor on: on a push to main it computed a *downgrade* (0.3.1 ->
+# 0.2.0) and failed anyway, because the repository does not allow GitHub Actions
+# to create pull requests. Keep it for an opt-in run, not on every push.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   release-please:
@@ -17,6 +20,3 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: node
-
-# Publishing is handled by .github/workflows/publish.yml, triggered by the tag
-# release-please creates, so a release never has two publishers.
