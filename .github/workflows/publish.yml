@@ -40,7 +40,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24' # npm 11.x, trusted publishing needs >= 11.5.1
-          registry-url: 'https://registry.npmjs.org'
+          # No `registry-url` on purpose: with it, setup-node v4 writes
+          # `_authToken=${NODE_AUTH_TOKEN}` into .npmrc and exports
+          # NODE_AUTH_TOKEN=XXXXX-XXXXX-XXXXX-XXXXX (authutil.ts), so npm sends a
+          # bogus token and never performs the OIDC exchange (fails with 404).
           package-manager-cache: false
 
       - name: Check out requested tag
@@ -78,6 +81,15 @@ jobs:
 
       - name: Rewrite README image paths for the tag
         run: node scripts/prepublish-readme.mjs "${{ steps.tag.outputs.tag }}"
+
+      - name: Confirm the OIDC environment is available
+        run: |
+          npm --version
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "::error::ACTIONS_ID_TOKEN_REQUEST_URL is empty; the job needs 'id-token: write'"
+            exit 1
+          fi
+          echo "OIDC token endpoint is available"
 
       - name: Inspect tarball
         run: npm pack --dry-run
