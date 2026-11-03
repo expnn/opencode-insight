@@ -44,7 +44,6 @@ jobs:
           # `_authToken=${NODE_AUTH_TOKEN}` into .npmrc and exports
           # NODE_AUTH_TOKEN=XXXXX-XXXXX-XXXXX-XXXXX (authutil.ts), so npm sends a
           # bogus token and never performs the OIDC exchange (fails with 404).
-          package-manager-cache: false
 
       - name: Check out requested tag
         if: ${{ github.event_name == 'workflow_dispatch' }}
