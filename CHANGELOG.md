@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0](https://github.com/expnn/opencode-insight/compare/v0.1.7...v0.2.0) (2026-11-03)
+
+
+### Features
+
+* ✨ Initializing the AI Agent ([766b0af](https://github.com/expnn/opencode-insight/commit/766b0afa4d566ec0dca3c79ffe967e590e815c8b))
+* Add sidebar stats line and make refresh/overlay-nav width configurable ([45297ee](https://github.com/expnn/opencode-insight/commit/45297ee58ea090c903c316ca96b60ed71352e15e))
+* support opencode v2 alongside v1 ([d49bc6e](https://github.com/expnn/opencode-insight/commit/d49bc6ecb3a1cdf50c29d4eabb12e066881f48e6))
+
+
+### Bug Fixes
+
+* 🐛 Fixed the issue where the overlay could not be disabled in opencode v1.17.14 ([3cda4c9](https://github.com/expnn/opencode-insight/commit/3cda4c93290462893336749c10a4cae7618f4436))
+
 ## [0.3.1](https://github.com/expnn/opencode-insight/compare/v0.3.0...v0.3.1) (2026-11-03)
 
 
