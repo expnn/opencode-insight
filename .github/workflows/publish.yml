@@ -1,0 +1,86 @@
+name: publish
+
+# Publishes a tagged release to npm via OIDC trusted publishing (no long-lived token).
+# release-please only creates the tag + GitHub release; this workflow is the single publisher.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to publish (e.g. v0.3.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git describe needs the tags
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24' # npm 11.x, trusted publishing needs >= 11.5.1
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Check out requested tag
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: git checkout --force "${{ inputs.tag }}"
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Verify
+        run: |
+          bun run typecheck
+          bun test
+          bun run build
+          bun run check:imports
+
+      - name: Check the checked-out commit is exactly the release tag
+        id: tag
+        run: |
+          tag="$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
+          version="$(node -p "require('./package.json').version")"
+          if [ -z "$tag" ]; then
+            echo "::error::HEAD ($(git rev-parse --short HEAD)) is not tagged; refusing to publish"
+            exit 1
+          fi
+          echo "HEAD is tag $tag; package.json version is $version"
+          if [ "${tag#v}" != "$version" ]; then
+            echo "::error::tag $tag does not match package.json version $version"
+            exit 1
+          fi
+          {
+            echo "tag=$tag"
+            echo "commit=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Rewrite README image paths for the tag
+        run: node scripts/prepublish-readme.mjs "${{ steps.tag.outputs.tag }}"
+
+      - name: Inspect tarball
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        run: npm publish --access public
