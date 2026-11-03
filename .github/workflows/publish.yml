@@ -96,3 +96,20 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --access public
+
+      - name: Diagnose the trusted-publishing exchange (only after a failed publish)
+        if: ${{ failure() }}
+        run: |
+          set +e
+          id_token=$(curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org" \
+            | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8"));process.stdout.write(j.value||"")')
+          echo "id token length: ${#id_token}"
+          [ -z "$id_token" ] && exit 0
+          # Same call npm/cli makes in lib/utils/oidc.js; the body carries the
+          # registry's reason (npm itself only logs it at --loglevel=verbose).
+          curl -sS -X POST \
+            -H "Authorization: Bearer $id_token" \
+            -w '\nhttp_status=%{http_code}\n' \
+            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/@expnn%2Fopencode-insight" \
+            | head -c 1200
