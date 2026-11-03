@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.3.1](https://github.com/expnn/opencode-insight/compare/v0.3.0...v0.3.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* restore OIDC trusted publishing: the publish workflow no longer passes `registry-url` to `actions/setup-node`, which exported a placeholder `NODE_AUTH_TOKEN` and made npm skip the OIDC exchange (`ENEEDAUTH`/`404`)
+* publish only from a release tag ref, so the SLSA provenance npm attaches records the released commit instead of the branch head it was dispatched from
+* lower the `@opentui/core` and `@opentui/solid` peer floor to `>=0.4.3`, matching the range the opencode v1 host itself requires
+* pin the dev toolchain to `@opentui/core` and `@opentui/solid` 0.4.3 so a local build reproduces the published bundle byte for byte
+
+## [0.3.0](https://github.com/expnn/opencode-insight/compare/v0.2.1...v0.3.0) (2026-09-26)
+
+
+### Features
+
+* support opencode v2 alongside v1 from one package: `tui()` for v1 and `setup()` for v2, behind per-host adapters in `src/host/`
+* migrate the v1 theme tokens to the v2 token set and normalize v1/v2 message shapes in `src/lib/normalize.ts`
+* move option parsing into `src/options.ts` (`sidebarRefreshIntervalMs`, `overlayRefreshIntervalMs`, `overlayNavPct`)
+* add a dist import guard (`bun run check:imports`) plus parity and unit tests
+
+## [0.2.1](https://github.com/expnn/opencode-insight/compare/v0.2.0...v0.2.1) (2026-07-10)
+
+
+### Features
+
+* add the sidebar stats line; make the refresh interval and overlay nav width configurable
+
+## [0.2.0](https://github.com/expnn/opencode-insight/compare/v0.1.8...v0.2.0) (2026-07-08)
+
+
+### Features
+
+* aggregate subagent usage stats into the root session
+
 ## [0.1.8](https://github.com/expnn/opencode-insight/compare/v0.1.7...v0.1.8) (2026-07-07)
 
 

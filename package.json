@@ -1,6 +1,6 @@
 {
   "name": "@expnn/opencode-insight",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,8 +31,8 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@opentui/core": ">=0.4.5",
-    "@opentui/solid": ">=0.4.5",
+    "@opentui/core": ">=0.4.3",
+    "@opentui/solid": ">=0.4.3",
     "solid-js": ">=1.9.0"
   },
   "peerDependenciesMeta": {
@@ -52,6 +52,8 @@
     "@opencode/client": "2.0.18",
     "@opencode/plugin": "2.0.18",
     "@opencode/theme": "2.0.18",
+    "@opentui/core": "0.4.3",
+    "@opentui/solid": "0.4.3",
     "bun-types": "latest",
     "esbuild-plugin-solid": "^0.6.0",
     "tsup": "^8.5.1",

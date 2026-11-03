@@ -1,18 +1,17 @@
 name: publish
 
-# Publishes a tagged release to npm via OIDC trusted publishing (no long-lived token).
-# release-please only creates the tag + GitHub release; this workflow is the single publisher.
+# Publishes a release tag to npm via OIDC trusted publishing (no long-lived token).
+# Only a tag ref may publish: the SLSA provenance npm attaches records the ref and
+# commit that *triggered* the run, so building from a branch and checking the tag
+# out afterwards would attest the branch commit instead of the released one.
+# For a manual publish, dispatch this workflow against the tag itself:
+#   gh workflow run publish.yml --ref v0.3.1
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Existing release tag to publish (e.g. v0.3.0)'
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -45,9 +44,33 @@ jobs:
           # NODE_AUTH_TOKEN=XXXXX-XXXXX-XXXXX-XXXXX (authutil.ts), so npm sends a
           # bogus token and never performs the OIDC exchange (fails with 404).
 
-      - name: Check out requested tag
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: git checkout --force "${{ inputs.tag }}"
+      - name: Verify the ref is the release tag
+        id: tag
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) ;;
+            *)
+              echo "::error::publishing runs must be dispatched against a release tag (refs/tags/v*), got $GITHUB_REF"
+              echo "::error::hint: gh workflow run publish.yml --ref vX.Y.Z"
+              exit 1
+              ;;
+          esac
+          tag="${GITHUB_REF#refs/tags/}"
+          version="$(node -p "require('./package.json').version")"
+          head_tag="$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
+          if [ "$head_tag" != "$tag" ]; then
+            echo "::error::HEAD ($(git rev-parse --short HEAD)) is not exactly tag $tag (got '${head_tag:-none}')"
+            exit 1
+          fi
+          if [ "${tag#v}" != "$version" ]; then
+            echo "::error::tag $tag does not match package.json version $version"
+            exit 1
+          fi
+          echo "publishing $tag at commit $(git rev-parse HEAD)"
+          {
+            echo "tag=$tag"
+            echo "commit=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -58,25 +81,6 @@ jobs:
           bun test
           bun run build
           bun run check:imports
-
-      - name: Check the checked-out commit is exactly the release tag
-        id: tag
-        run: |
-          tag="$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
-          version="$(node -p "require('./package.json').version")"
-          if [ -z "$tag" ]; then
-            echo "::error::HEAD ($(git rev-parse --short HEAD)) is not tagged; refusing to publish"
-            exit 1
-          fi
-          echo "HEAD is tag $tag; package.json version is $version"
-          if [ "${tag#v}" != "$version" ]; then
-            echo "::error::tag $tag does not match package.json version $version"
-            exit 1
-          fi
-          {
-            echo "tag=$tag"
-            echo "commit=$(git rev-parse HEAD)"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Rewrite README image paths for the tag
         run: node scripts/prepublish-readme.mjs "${{ steps.tag.outputs.tag }}"
@@ -107,12 +111,8 @@ jobs:
           [ -z "$id_token" ] && exit 0
           # Same call npm/cli makes in lib/utils/oidc.js; the body carries the
           # registry's reason (npm itself only logs it at --loglevel=verbose).
-          for name in "@expnn%2Fopencode-insight" "%40expnn%2Fopencode-insight"; do
-            echo "--- exchange for $name ---"
-            curl -sS -X POST \
-              -H "Authorization: Bearer $id_token" \
-              -w '\nhttp_status=%{http_code}\n' \
-              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/$name" \
-              | head -c 1200
-            echo
-          done
+          curl -sS -X POST \
+            -H "Authorization: Bearer $id_token" \
+            -w '\nhttp_status=%{http_code}\n' \
+            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/@expnn%2Fopencode-insight" \
+            | head -c 1200
